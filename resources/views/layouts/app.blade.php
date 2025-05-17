@@ -16,6 +16,8 @@
                 <a class="btn btn-light" href="{{ route('entities.index') }}">Entities</a>
                 <a class="btn btn-light" href="{{ route('branches.index') }}">Branches</a>
                 <a class="btn btn-light" href="{{ route('fund_clusters.index') }}">Fund Clusters</a>
+                
+                <a class="btn btn-light" href="{{ route('received_equipment.index') }}">Received Equipment</a>
                 <form action="{{ route('logout') }}" method="POST" class="d-inline">
                     @csrf
                     <button class="btn btn-outline-light ms-2">Logout</button>

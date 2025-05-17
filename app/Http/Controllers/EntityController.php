@@ -38,9 +38,8 @@ class EntityController extends Controller
     
         $entity = Entity::create($validated);
     
-      
-        return redirect()->route('received_equipment.create_with_entity', ['entity' => $entity->entity_id])
-                         ->with('success', 'Entity created successfully. Now add received equipment.');
+        return redirect()->route('received_equipment.create_with_entity', ['entityId' => $entity->entity_id])
+        ->with('success', 'Entity created successfully. Now add received equipment.');
     }
     
     

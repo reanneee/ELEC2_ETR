@@ -27,9 +27,16 @@ Route::middleware('auth')->group(function () {
     Route::resource('entities', EntityController::class);
     Route::resource('branches', BranchController::class);
     Route::resource('fund_clusters', FundClusterController::class);
+
+
     Route::resource('received_equipment', ReceivedEquipmentController::class);
-    Route::get('/received_equipment/create/{entity}', [ReceivedEquipmentController::class, 'createWithEntity'])
-    ->name('received_equipment.create_with_entity');
+ // Special route for creating equipment for a specific entity
+Route::get('received_equipment/entity/{entityId}', [ReceivedEquipmentController::class, 'createWithEntity'])
+->name('received_equipment.create_with_entity');
+
+
+
+Route::get('/received_equipment/{id}/generate-pdf', [ReceivedEquipmentController::class, 'generatePdf'])
+     ->name('received_equipment.generate_pdf');
 
 });
-

@@ -19,11 +19,6 @@ return new class extends Migration
                 ->on('entities')
                 ->onDelete('cascade');
         
-            $table->integer('quantity');
-            $table->string('unit', 50);
-            $table->text('description')->nullable();
-            $table->string('serial_no', 100)->nullable();
-            $table->string('property_no', 100)->nullable();
             $table->date('date_acquired')->nullable();
             $table->decimal('amount', 10, 2)->nullable();
             $table->string('received_by_name')->nullable();
@@ -31,9 +26,9 @@ return new class extends Migration
             $table->string('verified_by_name')->nullable();
             $table->string('verified_by_designation')->nullable();
             $table->date('receipt_date')->nullable();
+            $table->string('par_no')->nullable(); // Added PAR number field
             $table->timestamps();
         });
-        
     }
 
     /**
