@@ -30,13 +30,17 @@ Route::middleware('auth')->group(function () {
 
 
     Route::resource('received_equipment', ReceivedEquipmentController::class);
- // Special route for creating equipment for a specific entity
-Route::get('received_equipment/entity/{entityId}', [ReceivedEquipmentController::class, 'createWithEntity'])
-->name('received_equipment.create_with_entity');
+    // Special route for creating equipment for a specific entity
+    Route::get('received_equipment/entity/{entityId}', [ReceivedEquipmentController::class, 'createWithEntity'])
+        ->name('received_equipment.create_with_entity');
 
 
 
-Route::get('/received_equipment/{id}/generate-pdf', [ReceivedEquipmentController::class, 'generatePdf'])
-     ->name('received_equipment.generate_pdf');
+    Route::get('/received_equipment/{id}/generate-pdf', [ReceivedEquipmentController::class, 'generatePdf'])
+        ->name('received_equipment.generate_pdf');
 
+
+
+
+    Route::delete('received_equipment/descriptions/{descriptionId}/items/{itemId}', [ReceivedEquipmentController::class, 'deleteEquipmentItem'])->name('received_equipment.delete_item');
 });

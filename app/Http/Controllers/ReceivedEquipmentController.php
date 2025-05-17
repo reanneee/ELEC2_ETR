@@ -147,32 +147,189 @@ class ReceivedEquipmentController extends Controller
      */
     public function edit($id)
     {
-        $equipment = ReceivedEquipment::findOrFail($id);
-        $entities = Entity::all();
-        return view('received_equipment.edit', compact('equipment', 'entities'));
+        $receivedEquipment = ReceivedEquipment::with('entity.branch', 'entity.fundCluster', 'descriptions.items')->findOrFail($id);
+        $entity = $receivedEquipment->entity; // get entity from the equipment
+    
+        // Optionally, pass all entities if needed for dropdowns or selection
+        // $entities = Entity::all();
+    
+        return view('received_equipment.edit', compact('receivedEquipment', 'entity'));
     }
+    
+    
 
     /**
      * Update the specified resource in storage.
-     */
-    public function update(Request $request, $id)
-    {
-        $request->validate([
-            'entity_id' => 'required|exists:entities,entity_id',
-            'date_acquired' => 'required|date',
-            'amount' => 'required|numeric',
-            'received_by_name' => 'required|string',
-            'received_by_designation' => 'required|string',
-            'verified_by_name' => 'required|string',
-            'verified_by_designation' => 'required|string',
-            'receipt_date' => 'required|date',
+     *//**
+ * Update the specified resource in storage.
+ */
+public function update(Request $request, $id)
+{
+    // Log incoming data for debugging
+    Log::info('Updating Received Equipment Form Data:', $request->all());
+    
+    // Validate form data
+    $request->validate([
+        'entity_id' => 'required|exists:entities,entity_id',
+        'received_by_name' => 'required|string',
+        'received_by_designation' => 'required|string',
+        'verified_by_name' => 'required|string',
+        'verified_by_designation' => 'required|string',
+        'receipt_date' => 'required|date',
+        'equipments' => 'required|array|min:1',
+        'equipments.*.description' => 'required|string',
+        'equipments.*.quantity' => 'required|integer|min:1',
+        'equipments.*.unit' => 'required|string',
+        'equipments.*.items' => 'required|array|min:1',
+        'equipments.*.items.*.property_no' => 'required|string',
+        'equipments.*.items.*.serial_no' => 'nullable|string',
+        'equipments.*.items.*.date_acquired' => 'required|date',
+        'equipments.*.items.*.amount' => 'required|numeric|min:0',
+    ]);
+
+    // Calculate total amount across all items
+    $totalAmount = 0;
+    foreach ($request->equipments as $equipment) {
+        foreach ($equipment['items'] as $item) {
+            $totalAmount += floatval($item['amount']);
+        }
+    }
+
+    // Find earliest acquisition date from items
+    $earliestDate = now()->format('Y-m-d');
+    foreach ($request->equipments as $equipment) {
+        foreach ($equipment['items'] as $item) {
+            if (isset($item['date_acquired']) && $item['date_acquired'] < $earliestDate) {
+                $earliestDate = $item['date_acquired'];
+            }
+        }
+    }
+
+    // Update in a transaction
+    DB::beginTransaction();
+    try {
+        // Find the received equipment record
+        $receivedEquipment = ReceivedEquipment::with('descriptions.items')->findOrFail($id);
+        
+        // Update main equipment record
+        $receivedEquipment->update([
+            'entity_id' => $request->entity_id,
+            'date_acquired' => $earliestDate,
+            'amount' => $totalAmount,
+            'received_by_name' => $request->received_by_name,
+            'received_by_designation' => $request->received_by_designation,
+            'verified_by_name' => $request->verified_by_name,
+            'verified_by_designation' => $request->verified_by_designation,
+            'receipt_date' => $request->receipt_date,
+            // PAR number shouldn't be changed in update
         ]);
 
-        $equipment = ReceivedEquipment::findOrFail($id);
-        $equipment->update($request->all());
-
-        return redirect()->route('received_equipment.index')->with('success', 'Equipment updated successfully!');
+        // Track which descriptions are still in the request
+        $existingDescriptionIds = $receivedEquipment->descriptions->pluck('id')->toArray();
+        $updatedDescriptionIds = [];
+        
+        // Process each equipment group in the request
+        foreach ($request->equipments as $equipmentIndex => $equipmentData) {
+            $descriptionId = null;
+            
+            // Check if this is an existing description (when editing via index)
+            if ($equipmentIndex < count($existingDescriptionIds)) {
+                $descriptionId = $existingDescriptionIds[$equipmentIndex];
+                $description = ReceivedEquipmentDescription::find($descriptionId);
+                
+                if ($description) {
+                    // Update existing description
+                    $description->update([
+                        'description' => $equipmentData['description'],
+                        'quantity' => $equipmentData['quantity'],
+                        'unit' => $equipmentData['unit']
+                    ]);
+                    $updatedDescriptionIds[] = $descriptionId;
+                } else {
+                    // Create new description if not found
+                    $description = new ReceivedEquipmentDescription([
+                        'description' => $equipmentData['description'],
+                        'quantity' => $equipmentData['quantity'],
+                        'unit' => $equipmentData['unit']
+                    ]);
+                    $receivedEquipment->descriptions()->save($description);
+                }
+            } else {
+                // Create new description for new equipment groups
+                $description = new ReceivedEquipmentDescription([
+                    'description' => $equipmentData['description'],
+                    'quantity' => $equipmentData['quantity'],
+                    'unit' => $equipmentData['unit']
+                ]);
+                $receivedEquipment->descriptions()->save($description);
+            }
+            
+            // Track which items are still in the request
+            $existingItemIds = $description->items->pluck('id')->toArray();
+            $updatedItemIds = [];
+            
+            // Process items for this equipment group
+            foreach ($equipmentData['items'] as $itemIndex => $itemData) {
+                // Check if this is an existing item (when editing via index)
+                if ($itemIndex < count($existingItemIds)) {
+                    $itemId = $existingItemIds[$itemIndex];
+                    $item = ReceivedEquipmentItem::find($itemId);
+                    
+                    if ($item) {
+                        // Update existing item
+                        $item->update([
+                            'property_no' => $itemData['property_no'],
+                            'serial_no' => $itemData['serial_no'] ?? null,
+                            'date_acquired' => $itemData['date_acquired'],
+                            'amount' => $itemData['amount']
+                        ]);
+                        $updatedItemIds[] = $itemId;
+                    } else {
+                        // Create new item if not found
+                        $item = new ReceivedEquipmentItem([
+                            'property_no' => $itemData['property_no'],
+                            'serial_no' => $itemData['serial_no'] ?? null,
+                            'date_acquired' => $itemData['date_acquired'],
+                            'amount' => $itemData['amount']
+                        ]);
+                        $description->items()->save($item);
+                    }
+                } else {
+                    // Create new item for new entries
+                    $item = new ReceivedEquipmentItem([
+                        'property_no' => $itemData['property_no'],
+                        'serial_no' => $itemData['serial_no'] ?? null,
+                        'date_acquired' => $itemData['date_acquired'],
+                        'amount' => $itemData['amount']
+                    ]);
+                    $description->items()->save($item);
+                }
+            }
+            
+            // Remove items that were deleted in the UI
+            if (!empty($existingItemIds)) {
+                ReceivedEquipmentItem::whereIn('id', array_diff($existingItemIds, $updatedItemIds))
+                    ->delete();
+            }
+        }
+        
+        // Remove descriptions that were deleted in the UI
+        if (!empty($existingDescriptionIds)) {
+            ReceivedEquipmentDescription::whereIn('id', array_diff($existingDescriptionIds, $updatedDescriptionIds))
+                ->delete();
+        }
+        
+        DB::commit();
+        return redirect()->route('received_equipment.index')
+            ->with('success', 'Equipment updated successfully!');
+    } 
+    catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error updating received equipment: ' . $e->getMessage());
+        return back()->withInput()
+            ->with('error', 'Error updating equipment: ' . $e->getMessage());
     }
+}
 
     public function destroy($id)
     {
@@ -235,4 +392,50 @@ class ReceivedEquipmentController extends Controller
         
         return $pdf->download('PAR-' . $equipment->par_no . '.pdf');
     }
+
+    /**
+ * Delete an equipment item via AJAX
+ * 
+ * @param int $descriptionId
+ * @param int $itemId
+ * @return \Illuminate\Http\JsonResponse
+ */
+public function deleteEquipmentItem($descriptionId, $itemId)
+{
+    // Start a database transaction
+    DB::beginTransaction();
+    try {
+        // Find the item
+        $item = ReceivedEquipmentItem::findOrFail($itemId);
+        
+        // Store the amount to subtract from total
+        $amountToSubtract = $item->amount;
+        
+        // Find the description
+        $description = ReceivedEquipmentDescription::findOrFail($descriptionId);
+        
+        // Find the parent equipment
+        $receivedEquipment = $description->receivedEquipment;
+        
+        // Delete the item
+        $item->delete();
+        
+        // Update the equipment's total amount
+        $receivedEquipment->amount = $receivedEquipment->amount - $amountToSubtract;
+        $receivedEquipment->save();
+        
+        // If this was the last item for this description, you may want to delete the description too
+        if ($description->items()->count() === 0) {
+            $description->delete();
+        }
+        
+        DB::commit();
+        return response()->json(['success' => true, 'message' => 'Item deleted successfully']);
+    } 
+    catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error deleting equipment item: ' . $e->getMessage());
+        return response()->json(['success' => false, 'message' => 'Error deleting item: ' . $e->getMessage()], 500);
+    }
+}
 }
