@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('movement_record', function (Blueprint $table) {
+        Schema::table('movement_records', function (Blueprint $table) {
             $table->unsignedBigInteger('location_id')->nullable()->after('property_card_id');
 
             $table->foreign('location_id')

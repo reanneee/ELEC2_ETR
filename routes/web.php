@@ -7,6 +7,8 @@ use App\Http\Controllers\EntityController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\FundClusterController;
 use App\Http\Controllers\ReceivedEquipmentController;
+use App\Http\Controllers\PropertyCardController;
+
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -43,4 +45,27 @@ Route::middleware('auth')->group(function () {
 
 
     Route::delete('received_equipment/descriptions/{descriptionId}/items/{itemId}', [ReceivedEquipmentController::class, 'deleteEquipmentItem'])->name('received_equipment.delete_item');
+
+
+Route::get('/property_cards/create-row-template', function () {
+    return view('property_cards._movement_row', [
+        'movement' => null,
+        'i' => '__INDEX__',
+    ])->render();
+})->name('property_cards.movement_row');
+
+Route::get('/property-cards/{property_card}/pdf', [PropertyCardController::class, 'pdf'])->name('property_cards.pdf');
+
+Route::get('property_cards', [PropertyCardController::class, 'index'])->name('property_cards.index');
+Route::get('property_cards/create', [PropertyCardController::class, 'create'])->name('property_cards.create');
+Route::post('property_cards', [PropertyCardController::class, 'store'])->name('property_cards.store');
+Route::get('property_cards/{property_card}/edit', [PropertyCardController::class, 'edit'])->name('property_cards.edit');
+Route::put('property_cards/{property_card}', [PropertyCardController::class, 'update'])->name('property_cards.update');
+Route::delete('property_cards/{property_card}', [PropertyCardController::class, 'destroy'])->name('property_cards.destroy');
+
+
+
 });
+
+
+

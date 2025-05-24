@@ -26,7 +26,7 @@ return new class extends Migration
             $table->string('verified_by_name')->nullable();
             $table->string('verified_by_designation')->nullable();
             $table->date('receipt_date')->nullable();
-            $table->string('par_no')->nullable(); // Added PAR number field
+            $table->string('par_no')->unique()->nullable(); 
             $table->timestamps();
         });
     }

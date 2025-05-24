@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('property_card', function (Blueprint $table) {
+        Schema::create('property_cards', function (Blueprint $table) {
             $table->id('property_card_id');
             // $table->unsignedBigInteger('entity_id');
               $table->foreignId('entity_id')->constrained('entities', 'entity_id')->onDelete('cascade');
-            $table->string('property_number', 100)->nullable();
+            $table->string('property_number', 100)->unique()->nullable();
             $table->text('description')->nullable();
-            $table->unsignedBigInteger('movement_record_id')->nullable(); // will be set later
+            $table->unsignedBigInteger('movement_record_id')->nullable();
             $table->timestamps();
     
             // $table->foreign('entity_id')->references('entity_id')->on('entities')->onDelete('cascade');
