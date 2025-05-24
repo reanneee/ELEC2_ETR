@@ -8,12 +8,12 @@ class ReceivedEquipmentDescription extends Model
 {
     protected $table = 'received_equipment_description';
     protected $primaryKey = 'description_id';
-    
+
     protected $fillable = [
         'equipment_id',
         'description',
         'quantity',
-        'unit' // You might need to add this to your migration
+        'unit', // Make sure this column exists in your DB migration
     ];
 
     /**

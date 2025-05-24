@@ -35,7 +35,16 @@ class ReceivedEquipment extends Model
      * Get the entity that owns the equipment
      */
 
-  
+    //  public function items()
+    //  {
+    //      return $this->hasMany(ReceivedEquipmentItem::class, 'description_id', 'description_id');
+    //  }
+
+    public function items()
+{
+    return $this->hasMany(ReceivedEquipmentItem::class, 'description_id', 'description_id');
+}
+
     public function entity()
     {
         return $this->belongsTo(Entity::class, 'entity_id', 'entity_id');

@@ -48,6 +48,7 @@
         <a class="nav-link btn btn-dark text-start mb-2" href="{{ route('fund_clusters.index') }}">Fund Clusters</a>
         <a class="nav-link btn btn-dark text-start mb-2" href="{{ route('received_equipment.index') }}">Received Equipment</a>
         <a class="nav-link btn btn-dark text-start mb-2" href="{{ route('property_cards.index') }}">Property Cards</a>
+        <a class="nav-link btn btn-dark text-start mb-2" href="{{ route('equipment-list.index') }}">Equipments List</a>
 
         <form action="{{ route('logout') }}" method="POST" class="logout-form">
             @csrf
