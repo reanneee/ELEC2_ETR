@@ -217,23 +217,56 @@ public function store(Request $request)
         ]);
 
         // Store each inventory item in property_cards table
-        foreach ($request->inventory_items as $item) {
+        foreach ($request->inventory_items as $index => $item) {
             // First, get the received_equipment_item_id based on old_property_no
             $receivedEquipmentItem = DB::table('received_equipment_item')
                 ->where('property_no', $item['old_property_no'])
                 ->first();
 
             if ($receivedEquipmentItem) {
-                // Find the location_id based on location name
-                $locationParts = explode(' - ', $item['location']);
-                $buildingName = $locationParts[0] ?? '';
-                $officeName = $locationParts[1] ?? '';
+                // Parse the location string to get building and office name
+                $locationString = $item['location'];
+                $locationParts = explode(' - ', $locationString);
+                $buildingName = trim($locationParts[0] ?? '');
+                $officeName = isset($locationParts[1]) ? trim($locationParts[1]) : null;
                 
-                $location = DB::table('locations')
-                    ->where('building_name', $buildingName)
-                    ->where('office_name', $officeName)
-                    ->first();
+                // Find the location_id based on building and office name
+                $locationQuery = DB::table('locations')
+                    ->where('building_name', $buildingName);
+                
+                // Add office_name condition if it exists
+                if ($officeName) {
+                    $locationQuery->where('office_name', $officeName);
+                } else {
+                    // Handle case where office_name might be null or empty
+                    $locationQuery->where(function($query) {
+                        $query->whereNull('office_name')
+                              ->orWhere('office_name', '');
+                    });
+                }
+                
+                $location = $locationQuery->first();
+                
+                // If location not found, try to find by building name only
+                if (!$location) {
+                    $location = DB::table('locations')
+                        ->where('building_name', $buildingName)
+                        ->first();
+                }
+                
+                // Get the location ID, default to 1 if not found
+                $locationId = $location ? $location->id : 1;
+                
+                // Log the location lookup for debugging
+                Log::info('Location lookup for item ' . $index, [
+                    'location_string' => $locationString,
+                    'building_name' => $buildingName,
+                    'office_name' => $officeName,
+                    'found_location_id' => $locationId,
+                    'found_location' => $location
+                ]);
 
+                // Insert into property_cards table
                 DB::table('property_cards')->insert([
                     'received_equipment_item_id' => $receivedEquipmentItem->item_id,
                     'qty_physical' => $item['qty_physical'],
@@ -242,9 +275,15 @@ public function store(Request $request)
                     'issue_transfer_disposal' => '', // Default value, adjust as needed
                     'received_by_name' => '',
                     'article' => $item['article_item'],
-                    'locations_id' => $location ? $location->id : 1, // Default to 1 if location not found
+                    'locations_id' => $locationId,
                     'created_at' => now(),
                     'updated_at' => now(),
+                ]);
+            } else {
+                // Log if received_equipment_item not found
+                Log::warning('Received equipment item not found', [
+                    'property_no' => $item['old_property_no'],
+                    'item_index' => $index
                 ]);
             }
         }
@@ -290,53 +329,66 @@ public function store(Request $request)
             ->withInput();
     }
 }
-    public function saveLinkedEquipmentItem(Request $request)
-    {
-        try {
-            $request->validate([
-                'original_property_no' => 'required|string',
-                'reference_mmdd' => 'required|string',
-                'new_property_no' => 'required|string',
-                'location' => 'required|string',
-            ]);
-    
-            // Check if record exists
-            $existingRecord = DB::table('linked_equipment_items')
-                ->where('original_property_no', $request->original_property_no)
-                ->first();
-    
-            if ($existingRecord) {
-                // Update existing record
-                DB::table('linked_equipment_items')
-                    ->where('id', $existingRecord->id)
-                    ->update([
-                        'reference_mmdd' => $request->reference_mmdd,
-                        'new_property_no' => $request->new_property_no,
-                        'location' => $request->location,
-                        'updated_at' => now(),
-                    ]);
-            } else {
-                // Create new record
-                DB::table('linked_equipment_items')->insert([
-                    'original_property_no' => $request->original_property_no,
+
+public function saveLinkedEquipmentItem(Request $request)
+{
+    try {
+        $request->validate([
+            'original_property_no' => 'required|string',
+            'reference_mmdd' => 'required|string',
+            'new_property_no' => 'required|string',
+            'location' => 'required|string',
+        ]);
+
+        // Check if record exists
+        $existingRecord = DB::table('linked_equipment_items')
+            ->where('original_property_no', $request->original_property_no)
+            ->first();
+
+        if ($existingRecord) {
+            // Update existing record
+            DB::table('linked_equipment_items')
+                ->where('id', $existingRecord->id)
+                ->update([
                     'reference_mmdd' => $request->reference_mmdd,
                     'new_property_no' => $request->new_property_no,
                     'location' => $request->location,
-                    'created_at' => now(),
+                    'year' => date('Y'), // Add current year
                     'updated_at' => now(),
                 ]);
-            }
-    
-            return response()->json(['success' => true]);
-    
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 422);
+        } else {
+            // For new records, we need to get the fund_id
+            // This requires linking to the funds table based on some criteria
+            // You may need to adjust this based on your business logic
+            $fundId = 1; // Default fund_id - adjust as needed
+            
+            // Create new record
+            DB::table('linked_equipment_items')->insert([
+                'fund_id' => $fundId,
+                'original_property_no' => $request->original_property_no,
+                'reference_mmdd' => $request->reference_mmdd,
+                'new_property_no' => $request->new_property_no,
+                'year' => date('Y'),
+                'location' => $request->location,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
+
+        return response()->json(['success' => true]);
+
+    } catch (\Exception $e) {
+        Log::error('Error saving linked equipment item: ' . $e->getMessage(), [
+            'request_data' => $request->all(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage()
+        ], 422);
     }
-    
+}
     /**
      * Display the specified resource.
      */

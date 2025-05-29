@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use Illuminate\Http\Request;
 use App\Models\Entity;
 use App\Models\Fund;
@@ -38,149 +37,171 @@ class ReceivedEquipmentController extends Controller
      * Store a newly created resource in storage.
      */
  
-     public function store(Request $request)
-     {
-         Log::info('Received Equipment Form Data:', $request->all());
-         
-         $request->validate([
-             'entity_id' => 'required|exists:entities,entity_id',
-             'par_no' => 'required|string',
-             'received_by_name' => 'required|string',
-             'received_by_designation' => 'required|string',
-             'verified_by_name' => 'required|string',
-             'verified_by_designation' => 'required|string',
-             'receipt_date' => 'required|date',
-             'equipments' => 'required|array|min:1',
-             'equipments.*.description' => 'required|string',
-             'equipments.*.quantity' => 'required|integer|min:1',
-             'equipments.*.unit' => 'required|string',
-             'equipments.*.items' => 'required|array|min:1',
-             'equipments.*.items.*.property_no' => 'required|string',
-             'equipments.*.items.*.serial_no' => 'nullable|string',
-             'equipments.*.items.*.date_acquired' => 'required|date',
-             'equipments.*.items.*.amount' => 'required|numeric|min:0',
-         ]);
-     
-         $totalAmount = 0;
-         foreach ($request->equipments as $equipment) {
-             foreach ($equipment['items'] as $item) {
-                 $totalAmount += floatval($item['amount']);
-             }
-         }
-     
-         DB::beginTransaction();
-         try {
-             $earliestDate = now()->format('Y-m-d');
-             foreach ($request->equipments as $equipment) {
-                 foreach ($equipment['items'] as $item) {
-                     if (isset($item['date_acquired']) && $item['date_acquired'] < $earliestDate) {
-                         $earliestDate = $item['date_acquired'];
-                     }
-                 }
-             }
-     
-             $receivedEquipment = ReceivedEquipment::create([
-                 'entity_id' => $request->entity_id,
-                 'date_acquired' => $earliestDate,
-                 'amount' => $totalAmount,
-                 'received_by_name' => $request->received_by_name,
-                 'received_by_designation' => $request->received_by_designation,
-                 'verified_by_name' => $request->verified_by_name,
-                 'verified_by_designation' => $request->verified_by_designation,
-                 'receipt_date' => $request->receipt_date,
-                 'par_no' => $request->par_no,
-             ]);
-     
-             foreach ($request->equipments as $equipment) {
-                 $description = new ReceivedEquipmentDescription([
-                     'description' => $equipment['description'],
-                     'quantity' => $equipment['quantity'],
-                     'unit' => $equipment['unit']
-                 ]);
-                 
-                 $receivedEquipment->descriptions()->save($description);
-                 
-                 foreach ($equipment['items'] as $itemData) {
-                     $item = new ReceivedEquipmentItem([
-                         'property_no' => $itemData['property_no'],
-                         'serial_no' => $itemData['serial_no'] ?? null,
-                         'date_acquired' => $itemData['date_acquired'],
-                         'amount' => $itemData['amount']
-                     ]);
-                     
-                     $description->items()->save($item);
-                     
-                     $this->createLinkedEquipmentItem($itemData['property_no']);
-                 }
-             }
-             
-             DB::commit();
-             return redirect()->route('received_equipment.index')
-                 ->with('success', 'Received equipment saved successfully.');
-         } 
-         catch (\Exception $e) {
-             DB::rollBack();
-             Log::error('Error saving received equipment: ' . $e->getMessage());
-             return back()->withInput()
-                 ->with('error', 'Error saving equipment: ' . $e->getMessage());
-         }
-     }
-     
+   
+public function store(Request $request)
+{
+    // Log incoming data for debugging
+    Log::info('Received Equipment Form Data:', $request->all());
     
-     private function createLinkedEquipmentItem($propertyNo)
-     {
-         try {
-             // Extract MM-DD from property number (5th-8th digits)
-             // Property format: 2024-05-03-0699-01
-             $parts = explode('-', $propertyNo);
-             
-             if (count($parts) >= 3) {
-                 $mmdd = $parts[1] . $parts[2]; 
-                 $referenceMmdd = $parts[1] . '-' . $parts[2]; 
-                 
-                 $fund = Fund::where('code', $mmdd)->first();
-                 
-                 if ($fund) {
-                     $newPropertyNo = $this->generateNewPropertyNo();
-                     
-                     $linkedItem = LinkedEquipmentItem::create([
-                         'fund_id' => $fund->id,
-                         'original_property_no' => $propertyNo,
-                         'year' => now()->year,
-                         'reference_mmdd' => $referenceMmdd,
-                         'new_property_no' => $newPropertyNo,
-                         'location_id' => 1, // Default location representing "00"
-                     ]);
-                     
-                     return $linkedItem;
-                 }
-             }
-         } catch (\Exception $e) {
-             Log::error('Error creating linked equipment item: ' . $e->getMessage());
-         }
-         
-         return null;
-     }
-     
+    // Validate form data
+    $request->validate([
+        'entity_id' => 'required|exists:entities,entity_id',
+        'par_no' => 'required|string',
+        'received_by_name' => 'required|string',
+        'received_by_designation' => 'required|string',
+        'verified_by_name' => 'required|string',
+        'verified_by_designation' => 'required|string',
+        'receipt_date' => 'required|date',
+        'equipments' => 'required|array|min:1',
+        'equipments.*.description' => 'required|string',
+        'equipments.*.quantity' => 'required|integer|min:1',
+        'equipments.*.unit' => 'required|string',
+        'equipments.*.items' => 'required|array|min:1',
+        'equipments.*.items.*.property_no' => 'required|string',
+        'equipments.*.items.*.serial_no' => 'nullable|string',
+        'equipments.*.items.*.date_acquired' => 'required|date',
+        'equipments.*.items.*.amount' => 'required|numeric|min:0',
+    ]);
 
-     private function generateNewPropertyNo()
-     {
-         $lastItem = LinkedEquipmentItem::orderBy('new_property_no', 'desc')->first();
-         
-         if ($lastItem) {
-             $parts = explode('-', $lastItem->new_property_no);
-             $lastNumber = intval($parts[0]);
-             $nextNumber = $lastNumber + 1;
-         } else {
-             $nextNumber = 1;
-         }
-         
-         // Format as 4-digit number with -00 suffix
-         return sprintf('%04d-00', $nextNumber);
-     }
-    /**
-     * Display the specified resource.
-     */
+    // Calculate total amount across all items
+    $totalAmount = 0;
+    foreach ($request->equipments as $equipment) {
+        foreach ($equipment['items'] as $item) {
+            $totalAmount += floatval($item['amount']);
+        }
+    }
+
+    // Create received equipment (parent) within transaction
+    DB::beginTransaction();
+    try {
+        // Find earliest acquisition date from items
+        $earliestDate = now()->format('Y-m-d');
+        foreach ($request->equipments as $equipment) {
+            foreach ($equipment['items'] as $item) {
+                if (isset($item['date_acquired']) && $item['date_acquired'] < $earliestDate) {
+                    $earliestDate = $item['date_acquired'];
+                }
+            }
+        }
+
+        // Create main equipment record
+        $receivedEquipment = ReceivedEquipment::create([
+            'entity_id' => $request->entity_id,
+            'date_acquired' => $earliestDate,
+            'amount' => $totalAmount,
+            'received_by_name' => $request->received_by_name,
+            'received_by_designation' => $request->received_by_designation,
+            'verified_by_name' => $request->verified_by_name,
+            'verified_by_designation' => $request->verified_by_designation,
+            'receipt_date' => $request->receipt_date,
+            'par_no' => $request->par_no,
+        ]);
+
+        // Process each equipment group
+        foreach ($request->equipments as $equipment) {
+            // Create description record for this equipment
+            $description = new ReceivedEquipmentDescription([
+                'description' => $equipment['description'],
+                'quantity' => $equipment['quantity'],
+                'unit' => $equipment['unit']
+            ]);
+            
+            // Save description linked to parent equipment
+            $receivedEquipment->descriptions()->save($description);
+            
+            // Process items within this equipment group
+            foreach ($equipment['items'] as $itemData) {
+                // Create and save each item linked to this description
+                $item = new ReceivedEquipmentItem([
+                    'property_no' => $itemData['property_no'],
+                    'serial_no' => $itemData['serial_no'] ?? null,
+                    'date_acquired' => $itemData['date_acquired'],
+                    'amount' => $itemData['amount']
+                ]);
+                
+                $description->items()->save($item);
+                
+                // Create linked equipment item
+                $this->createLinkedEquipmentItem($itemData['property_no']);
+            }
+        }
+        
+        DB::commit();
+        return redirect()->route('received_equipment.index')
+            ->with('success', 'Received equipment saved successfully.');
+    } 
+    catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error saving received equipment: ' . $e->getMessage());
+        return back()->withInput()
+            ->with('error', 'Error saving equipment: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Create linked equipment item based on property number
+ */
+private function createLinkedEquipmentItem($propertyNo)
+{
+    try {
+        $parts = explode('-', $propertyNo);
+        
+        if (count($parts) >= 3) {
+            $mmdd = $parts[1] . $parts[2]; // "05" + "03" = "0503"
+            $referenceMmdd = $parts[1] . '-' . $parts[2]; // "05-03" for storage
+            
+            // Find fund by code
+            $fund = Fund::where('code', $mmdd)->first();
+            
+            if ($fund) {
+                // Generate new property number for this specific fund and reference_mmdd
+                $newPropertyNo = $this->generateNewPropertyNo($fund->id, $referenceMmdd);
+                
+                // Create linked equipment item with default location of "00"
+                $linkedItem = LinkedEquipmentItem::create([
+                    'fund_id' => $fund->id,
+                    'original_property_no' => $propertyNo,
+                    'reference_mmdd' => $referenceMmdd,
+                    'new_property_no' => $newPropertyNo,
+                    'year' => now()->year,
+                    'location' => '00', // Default location representing "00"
+                ]);
+                
+                return $linkedItem;
+            }
+        }
+    } catch (\Exception $e) {
+        // Log error but don't break the main transaction
+        Log::error('Error creating linked equipment item: ' . $e->getMessage());
+    }
+    
+    return null;
+}
+
+/**
+ * Generate new property number for specific fund and reference_mmdd
+ * Format: 0001, 0002, 0003, etc. (separate sequence per fund/reference combination)
+ */
+private function generateNewPropertyNo($fundId, $referenceMmdd)
+{
+    // Get the highest existing new_property_no for this specific fund_id and reference_mmdd
+    $lastItem = LinkedEquipmentItem::where('fund_id', $fundId)
+        ->where('reference_mmdd', $referenceMmdd)
+        ->orderBy('new_property_no', 'desc')
+        ->first();
+    
+    if ($lastItem) {
+        // Extract the number part and increment
+        $lastNumber = intval($lastItem->new_property_no);
+        $nextNumber = $lastNumber + 1;
+    } else {
+        // This is the first item for this fund/reference combination
+        $nextNumber = 1;
+    }
+    
+    // Format as 4-digit number: 0001, 0002, 0003, etc.
+    return sprintf('%04d', $nextNumber);
+}
     public function show($id)
     {
         $equipment = ReceivedEquipment::with('entity', 'descriptions.items')->findOrFail($id);
