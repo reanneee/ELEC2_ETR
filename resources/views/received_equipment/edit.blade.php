@@ -3,7 +3,6 @@
 @section('content')
 <div class="container py-5">
     <h2 class="mb-4 fw-bold">Edit Received Equipment</h2>
-
     <!-- Entity Info -->
     <div class="card shadow-sm mb-4">
         <div class="card-body">
@@ -17,7 +16,7 @@
     </div>
 
     <!-- Form Start -->
-    <form action="{{ route('received_equipment.update', $receivedEquipment->id) }}" method="POST" id="equipmentForm">
+    <form action="{{ route('received_equipment.update', $receivedEquipment->equipment_id) }}" method="POST" id="equipmentForm">
         @csrf
         @method('PUT')
         <input type="hidden" name="entity_id" value="{{ $entity->entity_id }}">
@@ -190,9 +189,9 @@
     </form>
 </div>
 
+
 <script>
-// Define equipmentIndex variable
-// var equipmentIndex = {{ $receivedEquipment->descriptions->count() }};
+var equipmentIndex = {{ $receivedEquipment->descriptions->count() }};
 
 function autoResizeTextarea(textarea) {
     textarea.style.height = 'auto';
@@ -289,6 +288,7 @@ function generateRows() {
 function addManualRow() {
     const tbody = document.querySelector('#equipmentTable tbody');
     const tr = document.createElement('tr');
+    tr.dataset.group = equipmentIndex;
     tr.innerHTML = `
         <td><input type="number" name="equipments[${equipmentIndex}][quantity]" class="form-control" value="1" required></td>
         <td><input type="text" name="equipments[${equipmentIndex}][unit]" class="form-control" required></td>
@@ -297,13 +297,14 @@ function addManualRow() {
         <td><input type="text" name="equipments[${equipmentIndex}][items][0][serial_no]" class="form-control"></td>
         <td><input type="date" name="equipments[${equipmentIndex}][items][0][date_acquired]" class="form-control" required></td>
         <td><input type="number" name="equipments[${equipmentIndex}][items][0][amount]" class="form-control amount-field" step="0.01" oninput="calculateTotal()" required></td>
-        <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove(); calculateTotal()">Delete</button></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="deleteRowGroup(${equipmentIndex})">Delete</button></td>
     `;
     tbody.appendChild(tr);
     equipmentIndex++;
 
     // Auto-resize textarea in new manual row
     document.querySelectorAll('.auto-resize-textarea').forEach(autoResizeTextarea);
+    calculateTotal();
 }
 
 function deleteRowGroup(groupId) {
@@ -321,56 +322,45 @@ function calculateTotal() {
 }
 
 function validateBeforeSubmit(event) {
-    const tbody = document.querySelector('#equipmentTable tbody');
-    if (tbody.children.length === 0) {
+    // Check if we have equipment items
+    const equipmentInputs = document.querySelectorAll('input[name*="equipments"][name*="property_no"]');
+    if (equipmentInputs.length === 0) {
         event.preventDefault();
         alert('Please add at least one equipment item before saving.');
         return false;
     }
     
-    // Final check for required fields
+    // Check if all required fields are filled
     const form = document.getElementById('equipmentForm');
-    if (!form.checkValidity()) {
+    const requiredFields = form.querySelectorAll('[required]');
+    let hasEmptyFields = false;
+    
+    requiredFields.forEach(field => {
+        if (!field.value.trim()) {
+            hasEmptyFields = true;
+            field.classList.add('is-invalid');
+        } else {
+            field.classList.remove('is-invalid');
+        }
+    });
+    
+    if (hasEmptyFields) {
         event.preventDefault();
-        // Trigger browser's built-in validation
-        form.reportValidity();
+        alert('Please fill all required fields.');
         return false;
     }
     
     return true;
 }
 
-// Function to handle deleting individual items with AJAX
-function deleteItem(descriptionId, itemId, element) {
-    if (!confirm('Are you sure you want to delete this item?')) {
-        return;
+// Add CSS for invalid fields
+const style = document.createElement('style');
+style.textContent = `
+    .is-invalid {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
     }
-
-    fetch(`/received_equipment/descriptions/${descriptionId}/items/${itemId}`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Remove the item row
-            element.closest('tr').remove();
-            calculateTotal();
-            
-            // Show success message
-            alert('Item deleted successfully');
-        } else {
-            alert('Error deleting item: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while deleting the item');
-    });
-}
+`;
+document.head.appendChild(style);
 </script>
 @endsection
