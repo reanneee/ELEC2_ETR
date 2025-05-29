@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\ReceivedEquipmentDescription;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Services\PropertyNumberService;
 
 class ReceivedEquipmentDescriptionController extends Controller
@@ -127,108 +128,213 @@ class ReceivedEquipmentDescriptionController extends Controller
     /**
      * Create inventory count form
      */
-    public function createInventory(Request $request)
-    {
-        $request->validate([
-            'selected_items' => 'required|array',
-            'selected_items.*' => 'exists:received_equipment_description,description_id',
-            'quantities' => 'required|array',
-            'quantities.*' => 'integer|min:1'
-        ]);
+//     public function createInventory(Request $request)
+//     {
+//         $request->validate([
+//             'selected_items' => 'required|array',
+//             'selected_items.*' => 'exists:received_equipment_description,description_id',
+//             'quantities' => 'required|array',
+//             'quantities.*' => 'integer|min:1'
+//         ]);
         
-        $selectedDescriptionIds = $request->selected_items;
-        $quantities = $request->quantities;
+//         $selectedDescriptionIds = $request->selected_items;
+//         $quantities = $request->quantities;
         
-        // Get selected descriptions with their items and equipment details
-        $descriptions = DB::table('received_equipment_description as red')
-            ->join('received_equipment as re', 'red.equipment_id', '=', 're.equipment_id')
-            ->whereIn('red.description_id', $selectedDescriptionIds)
-            ->select('red.*', 're.par_no', 're.amount')
-            ->get();
+//         // Get selected descriptions with their items and equipment details
+//         $descriptions = DB::table('received_equipment_description as red')
+//             ->join('received_equipment as re', 'red.equipment_id', '=', 're.equipment_id')
+//             ->whereIn('red.description_id', $selectedDescriptionIds)
+//             ->select('red.*', 're.par_no', 're.amount')
+//             ->get();
         
-        // Get items for selected descriptions with additional details
-        $items = DB::table('received_equipment_item')
-            ->whereIn('description_id', $selectedDescriptionIds)
-            ->get()
-            ->groupBy('description_id');
+//         // Get items for selected descriptions with additional details
+//         $items = DB::table('received_equipment_item')
+//             ->whereIn('description_id', $selectedDescriptionIds)
+//             ->get()
+//             ->groupBy('description_id');
         
-        // Attach items to descriptions
-        foreach ($descriptions as $description) {
-            $description->items = $items->get($description->description_id, collect());
-            $description->inventory_quantity = $quantities[$description->description_id] ?? $description->quantity;
-        }
+//         // Attach items to descriptions
+//         foreach ($descriptions as $description) {
+//             $description->items = $items->get($description->description_id, collect());
+//             $description->inventory_quantity = $quantities[$description->description_id] ?? $description->quantity;
+//         }
         
-        // Get fund matches for article/item classification
-        // Updated logic to match 4th-7th digits of fund account code with property number pattern
-        $fundMatches = DB::table('received_equipment_item as rei')
-            ->join('funds as f', function($join) {
-                // Extract MM-DD from property_no (positions 5-9) and compare with 4th-7th digits of account_code
-                $join->on(DB::raw("REPLACE(SUBSTRING(rei.property_no, 6, 5), '-', '')"), '=', DB::raw("SUBSTRING(f.account_code, 4, 4)"));
-            })
-            ->select('rei.item_id', 'rei.property_no', 'f.account_code', 'f.account_title', 'f.id as fund_id')
-            ->get()
-            ->keyBy('item_id');
+//         // Get fund matches for article/item classification
+//         // Updated logic to match 4th-7th digits of fund account code with property number pattern
+//         $fundMatches = DB::table('received_equipment_item as rei')
+//             ->join('funds as f', function($join) {
+//                 // Extract MM-DD from property_no (positions 5-9) and compare with 4th-7th digits of account_code
+//                 $join->on(DB::raw("REPLACE(SUBSTRING(rei.property_no, 6, 5), '-', '')"), '=', DB::raw("SUBSTRING(f.account_code, 4, 4)"));
+//             })
+//             ->select('rei.item_id', 'rei.property_no', 'f.account_code', 'f.account_title', 'f.id as fund_id')
+//             ->get()
+//             ->keyBy('item_id');
         
-        // Get existing linked equipment items (new property numbers)
-        $linkedItems = DB::table('linked_equipment_items')
-            ->select('original_property_no', 'new_property_no', 'id')
-            ->get()
-            ->keyBy('original_property_no');
+//         // Get existing linked equipment items (new property numbers)
+//         $linkedItems = DB::table('linked_equipment_items')
+//             ->select('original_property_no', 'new_property_no', 'id')
+//             ->get()
+//             ->keyBy('original_property_no');
         
-        // Get equipment items for location information
-        $equipmentItems = DB::table('equipment_items')
-            ->select('property_no', 'location_id', 'status')
-            ->get();
+//         // Get equipment items for location information
+//         $equipmentItems = DB::table('equipment_items')
+//             ->select('property_no', 'location_id', 'status')
+//             ->get();
         
-        // Get all locations for dropdown
-        $locations = DB::table('locations')
-            ->select('id', 'building_name', 'office_name', 'officer_name')
-            ->orderBy('building_name')
-            ->orderBy('office_name')
-            ->get();
+//         // Get all locations for dropdown
+//         $locations = DB::table('locations')
+//             ->select('id', 'building_name', 'office_name', 'officer_name')
+//             ->orderBy('building_name')
+//             ->orderBy('office_name')
+//             ->get();
         
-        // Get entities for dropdown
-        $entities = DB::table('entities')
-            ->select('entity_id', 'entity_name')
-            ->orderBy('entity_name')
-            ->get();
+//         // Get entities for dropdown
+//         $entities = DB::table('entities')
+//             ->select('entity_id', 'entity_name')
+//             ->orderBy('entity_name')
+//             ->get();
         
-        return view('inventory_count_form.create', compact(
-            'descriptions', 
-            'fundMatches', 
-            'quantities', 
-            'equipmentItems', 
-            'locations', 
-            'entities',
-            'linkedItems'
-        ));
-    }
+//         return view('inventory_count_form.create', compact(
+//             'descriptions', 
+//             'fundMatches', 
+//             'quantities', 
+//             'equipmentItems', 
+//             'locations', 
+//             'entities',
+//             'linkedItems'
+//         ));
+//     }
 
-    public function generatePropertyNumber(Request $request)
+//     public function generatePropertyNumber(Request $request)
+// {
+//     $request->validate([
+//         'old_property_no' => 'required|string',
+//         'fund_account_code' => 'required|string',
+//         'location_id' => 'nullable|integer'
+//     ]);
+    
+//     try {
+//         $newPropertyNo = PropertyNumberService::generateForEquipmentItem(
+//             $request->old_property_no,
+//             $request->fund_account_code,
+//             $request->location_id
+//         );
+        
+//         return response()->json([
+//             'success' => true,
+//             'new_property_no' => $newPropertyNo
+//         ]);
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'success' => false,
+//             'error' => $e->getMessage()
+//         ], 500);
+//     }
+// }
+public function createInventory(Request $request)
 {
-    $request->validate([
-        'old_property_no' => 'required|string',
-        'fund_account_code' => 'required|string',
-        'location_id' => 'nullable|integer'
+    // Debug: Log the incoming request data
+    Log::info('Received request data:', [
+        'selected_items' => $request->selected_items,
+        'quantities' => $request->quantities,
+        'all_input' => $request->all()
     ]);
     
-    try {
-        $newPropertyNo = PropertyNumberService::generateForEquipmentItem(
-            $request->old_property_no,
-            $request->fund_account_code,
-            $request->location_id
-        );
+    $request->validate([
+        'selected_items' => 'required|array',
+        'selected_items.*' => 'exists:received_equipment_description,description_id',
+        'quantities' => 'required|array',
+        'quantities.*' => 'integer|min:1'
+    ]);
+    
+    $selectedDescriptionIds = $request->selected_items;
+    $quantities = $request->quantities;
+    
+    // Debug: Log the processed data
+    Log::info('Processed data:', [
+        'selectedDescriptionIds' => $selectedDescriptionIds,
+        'quantities' => $quantities
+    ]);
+    
+    // Get selected descriptions with their items and equipment details
+    $descriptions = DB::table('received_equipment_description as red')
+        ->join('received_equipment as re', 'red.equipment_id', '=', 're.equipment_id')
+        ->whereIn('red.description_id', $selectedDescriptionIds)
+        ->select('red.*', 're.par_no', 're.amount')
+        ->get();
+    
+    // Get items for selected descriptions with additional details
+    $items = DB::table('received_equipment_item')
+        ->whereIn('description_id', $selectedDescriptionIds)
+        ->get()
+        ->groupBy('description_id');
+    
+    // Attach items to descriptions and prepare inventory rows
+    foreach ($descriptions as $description) {
+        $allItems = $items->get($description->description_id, collect());
+        $inventoryQuantity = $quantities[$description->description_id] ?? $description->quantity;
         
-        return response()->json([
-            'success' => true,
-            'new_property_no' => $newPropertyNo
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'error' => $e->getMessage()
-        ], 500);
+        // Take only the number of items specified in inventory_quantity
+        $description->items = $allItems->take($inventoryQuantity);
+        $description->inventory_quantity = $inventoryQuantity;
+        $description->total_available = $allItems->count(); // Total available items
+        
+        // Calculate unit value if not set (total amount divided by total quantity)
+        if ($description->amount && $description->quantity > 0) {
+            $description->unit_value = $description->amount / $description->quantity;
+        } else {
+            $description->unit_value = 0;
+        }
+        
+        // Debug: Log each description's quantity assignment
+        Log::info("Description {$description->description_id}: total_available={$description->total_available}, inventory_quantity={$description->inventory_quantity}, actual_rows={$description->items->count()}, unit_value={$description->unit_value}");
     }
+    
+    // Get fund matches for article/item classification
+    // Updated logic to match 4th-7th digits of fund account code with property number pattern
+    $fundMatches = DB::table('received_equipment_item as rei')
+        ->join('funds as f', function($join) {
+            // Extract MM-DD from property_no (positions 5-9) and compare with 4th-7th digits of account_code
+            $join->on(DB::raw("REPLACE(SUBSTRING(rei.property_no, 6, 5), '-', '')"), '=', DB::raw("SUBSTRING(f.account_code, 4, 4)"));
+        })
+        ->select('rei.item_id', 'rei.property_no', 'f.account_code', 'f.account_title', 'f.id as fund_id')
+        ->get()
+        ->keyBy('item_id');
+    
+    // Get existing linked equipment items (new property numbers)
+    $linkedItems = DB::table('linked_equipment_items')
+        ->select('original_property_no', 'new_property_no', 'id')
+        ->get()
+        ->keyBy('original_property_no');
+    
+    // Get equipment items for location information
+    $equipmentItems = DB::table('equipment_items')
+        ->select('property_no', 'location_id', 'status')
+        ->get();
+    
+    // Get all locations for dropdown
+    $locations = DB::table('locations')
+        ->select('id', 'building_name', 'office_name', 'officer_name')
+        ->orderBy('building_name')
+        ->orderBy('office_name')
+        ->get();
+    
+    // Get entities for dropdown
+    $entities = DB::table('entities')
+        ->select('entity_id', 'entity_name')
+        ->orderBy('entity_name')
+        ->get();
+    
+    // Fix: Change $descriptions to $processedDescriptions to match the Blade template
+    return view('inventory_count_form.create', compact(
+        'descriptions', 
+        'fundMatches', 
+        'quantities', 
+        'equipmentItems', 
+        'locations', 
+        'entities',
+        'linkedItems'
+    ))->with('processedDescriptions', $descriptions); // Add this line
 }
     /**
      * Display the specified resource.

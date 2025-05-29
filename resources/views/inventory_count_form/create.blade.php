@@ -86,130 +86,131 @@
                         </thead>
                         <tbody id="inventoryTableBody">
                             <!-- Fixed section for your Blade template -->
-                            @php $itemIndex = 0; @endphp
-                            @foreach($descriptions as $description)
-                            @foreach($description->items as $item)
-                            @php
-                            $fundMatch = $fundMatches->get($item->item_id);
-                            $equipmentItem = $equipmentItems->firstWhere('property_no', $item->property_no);
-                            $linkedItem = $linkedItems->get($item->property_no);
-                            // Fix: Define $currentNewPropertyNo properly
-                            $currentNewPropertyNo = $linkedItem ? $linkedItem->new_property_no : '';
-                            @endphp
-                            <tr class="inventory-row" data-description-id="{{ $description->description_id }}">
-                                <!-- Article/Item Column -->
-                                <td>
-                                    <input type="text" class="form-control form-control-sm"
-                                        name="inventory_items[{{ $itemIndex }}][article_item]"
-                                        value="{{ $fundMatch->account_title ?? 'N/A' }}" readonly>
-                                </td>
+                          <!-- Fixed section for your Blade template -->
+@php $itemIndex = 0; @endphp
+@foreach($processedDescriptions as $description)
+    @foreach($description->items as $item)
+        @php
+        $fundMatch = $fundMatches->get($item->item_id);
+        $equipmentItem = $equipmentItems->firstWhere('property_no', $item->property_no);
+        $linkedItem = $linkedItems->get($item->property_no);
+        $currentNewPropertyNo = $linkedItem ? $linkedItem->new_property_no : '';
+        @endphp
+        <tr class="inventory-row" data-description-id="{{ $description->description_id }}">
+            <!-- Article/Item Column -->
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                    name="inventory_items[{{ $itemIndex }}][article_item]"
+                    value="{{ $fundMatch->account_title ?? 'N/A' }}" readonly>
+            </td>
 
-                                <!-- Description Column -->
-                                <td>
-                                    <textarea class="form-control form-control-sm"
-                                        name="inventory_items[{{ $itemIndex }}][description]"
-                                        rows="2" readonly>{{ $description->description }}</textarea>
-                                    <input type="hidden" name="inventory_items[{{ $itemIndex }}][entity_id]" value="">
-                                </td>
+            <!-- Description Column -->
+            <td>
+                <textarea class="form-control form-control-sm"
+                    name="inventory_items[{{ $itemIndex }}][description]"
+                    rows="2" readonly>{{ $description->description }}</textarea>
+                <input type="hidden" name="inventory_items[{{ $itemIndex }}][entity_id]" value="">
+                <small class="text-muted">Selected: {{ $description->inventory_quantity }} of {{ $description->total_available }} available</small>
+            </td>
 
-                                <!-- Old Property No Column -->
-                                <td>
-                                    <input type="text" class="form-control form-control-sm"
-                                        name="inventory_items[{{ $itemIndex }}][old_property_no]"
-                                        value="{{ $item->property_no }}" readonly>
-                                </td>
+            <!-- Old Property No Column -->
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                    name="inventory_items[{{ $itemIndex }}][old_property_no]"
+                    value="{{ $item->property_no }}" readonly>
+            </td>
 
-                                <!-- New Property No Column - FIXED -->
-                                <td>
-                                    <input type="text" class="form-control form-control-sm new-property-input"
-                                        name="inventory_items[{{ $itemIndex }}][new_property_no]"
-                                        value="{{ $currentNewPropertyNo }}"
-                                        data-old-property="{{ $item->property_no }}"
-                                        data-fund-account-code="{{ $fundMatch->account_code ?? '' }}"
-                                        readonly>
-                                </td>
+            <!-- New Property No Column -->
+            <td>
+                <input type="text" class="form-control form-control-sm new-property-input"
+                    name="inventory_items[{{ $itemIndex }}][new_property_no]"
+                    value="{{ $currentNewPropertyNo }}"
+                    data-old-property="{{ $item->property_no }}"
+                    data-fund-account-code="{{ $fundMatch->account_code ?? '' }}"
+                    readonly>
+            </td>
 
-                                <!-- Unit Column -->
-                                <td>
-                                    <input type="text" class="form-control form-control-sm"
-                                        name="inventory_items[{{ $itemIndex }}][unit]"
-                                        value="{{ $description->unit }}" readonly>
-                                </td>
+            <!-- Unit Column -->
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                    name="inventory_items[{{ $itemIndex }}][unit]"
+                    value="{{ $description->unit }}" readonly>
+            </td>
 
-                                <!-- Unit Value Column -->
-                                <td>
-                                    <input type="number" class="form-control form-control-sm unit-value"
-                                        name="inventory_items[{{ $itemIndex }}][unit_value]"
-                                        value="{{ $description->amount ?? 0 }}"
-                                        step="0.01" min="0">
-                                </td>
+            <!-- Unit Value Column -->
+            <td>
+    <input type="number" class="form-control form-control-sm unit-value"
+        name="inventory_items[{{ $itemIndex }}][unit_value]"
+        value="{{ $item->unit_value ?? $description->unit_value ?? 0 }}"
+        step="0.01" min="0">
+</td>
 
-                                <!-- Qty Card Column -->
-                                <td>
-                                    <input type="number" class="form-control form-control-sm qty-card"
-                                        name="inventory_items[{{ $itemIndex }}][qty_card]"
-                                        value="1"
-                                        min="0" readonly>
-                                </td>
+            <!-- Qty Card Column - This represents 1 unit per individual item -->
+            <td>
+                <input type="number" class="form-control form-control-sm qty-card"
+                    name="inventory_items[{{ $itemIndex }}][qty_card]"
+                    value="1"
+                    min="0" readonly>
+            </td>
 
-                                <!-- Qty Physical Column -->
-                                <td>
-                                    <input type="number" class="form-control form-control-sm qty-physical"
-                                        name="inventory_items[{{ $itemIndex }}][qty_physical]"
-                                        value="1"
-                                        min="0" required>
-                                </td>
+            <!-- Qty Physical Column - Default to 1 for physical count -->
+            <td>
+                <input type="number" class="form-control form-control-sm qty-physical"
+                    name="inventory_items[{{ $itemIndex }}][qty_physical]"
+                    value="1"
+                    min="0" required>
+            </td>
 
-                                <!-- Location Column -->
-                                <td>
-                                    <select class="form-select form-select-sm location-select"
-                                        name="inventory_items[{{ $itemIndex }}][location]"
-                                        data-row-index="{{ $itemIndex }}" required>
-                                        <option value="">Select Location</option>
-                                        @foreach($locations as $location)
-                                        <option value="{{ $location->building_name }} - {{ $location->office_name }}"
-                                            data-location-id="{{ $location->id }}"
-                                            {{ (optional($equipmentItem)->location_id == $location->id) ? 'selected' : '' }}>
-                                            {{ $location->building_name }}
-                                            @if($location->office_name)
-                                            - {{ $location->office_name }}
-                                            @endif
-                                            @if($location->officer_name)
-                                            ({{ $location->officer_name }})
-                                            @endif
-                                        </option>
-                                        @endforeach
-                                    </select>
-                                </td>
+            <!-- Location Column -->
+            <td>
+                <select class="form-select form-select-sm location-select"
+                    name="inventory_items[{{ $itemIndex }}][location]"
+                    data-row-index="{{ $itemIndex }}" required>
+                    <option value="">Select Location</option>
+                    @foreach($locations as $location)
+                    <option value="{{ $location->building_name }} - {{ $location->office_name }}"
+                        data-location-id="{{ $location->id }}"
+                        {{ (optional($equipmentItem)->location_id == $location->id) ? 'selected' : '' }}>
+                        {{ $location->building_name }}
+                        @if($location->office_name)
+                        - {{ $location->office_name }}
+                        @endif
+                        @if($location->officer_name)
+                        ({{ $location->officer_name }})
+                        @endif
+                    </option>
+                    @endforeach
+                </select>
+            </td>
 
-                                <!-- Condition Column -->
-                                <td>
-                                    <select class="form-select form-select-sm condition-select"
-                                        name="inventory_items[{{ $itemIndex }}][condition]" required>
-                                        <option value="">Select Condition</option>
-                                        <option value="Serviceable" {{ ($item->condition ?? '') == 'Serviceable' ? 'selected' : '' }}>Serviceable</option>
-                                        <option value="Unserviceable" {{ ($item->condition ?? '') == 'Unserviceable' ? 'selected' : '' }}>Unserviceable</option>
-                                        <option value="For Repair" {{ ($item->condition ?? '') == 'For Repair' ? 'selected' : '' }}>For Repair</option>
-                                        <option value="For Disposal" {{ ($item->condition ?? '') == 'For Disposal' ? 'selected' : '' }}>For Disposal</option>
-                                        <option value="Missing" {{ ($item->condition ?? '') == 'Missing' ? 'selected' : '' }}>Missing</option>
-                                        <option value="Damaged" {{ ($item->condition ?? '') == 'Damaged' ? 'selected' : '' }}>Damaged</option>
-                                        <option value="New" {{ ($item->condition ?? '') == 'New' ? 'selected' : '' }}>New</option>
-                                        <option value="Used - Good" {{ ($item->condition ?? '') == 'Used - Good' ? 'selected' : '' }}>Used - Good</option>
-                                        <option value="Used - Fair" {{ ($item->condition ?? '') == 'Used - Fair' ? 'selected' : '' }}>Used - Fair</option>
-                                        <option value="Obsolete" {{ ($item->condition ?? '') == 'Obsolete' ? 'selected' : '' }}>Obsolete</option>
-                                    </select>
-                                </td>
+            <!-- Condition Column -->
+            <td>
+                <select class="form-select form-select-sm condition-select"
+                    name="inventory_items[{{ $itemIndex }}][condition]" required>
+                    <option value="">Select Condition</option>
+                    <option value="Serviceable" {{ ($item->condition ?? '') == 'Serviceable' ? 'selected' : '' }}>Serviceable</option>
+                    <option value="Unserviceable" {{ ($item->condition ?? '') == 'Unserviceable' ? 'selected' : '' }}>Unserviceable</option>
+                    <option value="For Repair" {{ ($item->condition ?? '') == 'For Repair' ? 'selected' : '' }}>For Repair</option>
+                    <option value="For Disposal" {{ ($item->condition ?? '') == 'For Disposal' ? 'selected' : '' }}>For Disposal</option>
+                    <option value="Missing" {{ ($item->condition ?? '') == 'Missing' ? 'selected' : '' }}>Missing</option>
+                    <option value="Damaged" {{ ($item->condition ?? '') == 'Damaged' ? 'selected' : '' }}>Damaged</option>
+                    <option value="New" {{ ($item->condition ?? '') == 'New' ? 'selected' : '' }}>New</option>
+                    <option value="Used - Good" {{ ($item->condition ?? '') == 'Used - Good' ? 'selected' : '' }}>Used - Good</option>
+                    <option value="Used - Fair" {{ ($item->condition ?? '') == 'Used - Fair' ? 'selected' : '' }}>Used - Fair</option>
+                    <option value="Obsolete" {{ ($item->condition ?? '') == 'Obsolete' ? 'selected' : '' }}>Obsolete</option>
+                </select>
+            </td>
 
-                                <!-- Remarks Column -->
-                                <td>
-                                    <textarea class="form-control form-control-sm"
-                                        name="inventory_items[{{ $itemIndex }}][remarks]"
-                                        rows="2" placeholder="Enter remarks..."></textarea>
-                                </td>
-                            </tr>
-                            @php $itemIndex++; @endphp
-                            @endforeach
-                            @endforeach
+            <!-- Remarks Column -->
+            <td>
+                <textarea class="form-control form-control-sm"
+                    name="inventory_items[{{ $itemIndex }}][remarks]"
+                    rows="2" placeholder="Enter remarks..."></textarea>
+            </td>
+        </tr>
+        @php $itemIndex++; @endphp
+    @endforeach
+@endforeach
                         </tbody>
                     </table>
                 </div>

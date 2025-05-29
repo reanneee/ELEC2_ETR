@@ -208,14 +208,40 @@ document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('inventoryForm');
         const quantityInputsElements = document.querySelectorAll('.quantity-input');
         
-        // Add quantity inputs to the main form
+        // Remove any existing quantity hidden inputs to prevent duplicates
+        const existingQuantityInputs = form.querySelectorAll('input[name^="quantities["]');
+        existingQuantityInputs.forEach(input => input.remove());
+        
+        // Debug: Log the quantities being processed
+        console.log('Processing quantities:');
         quantityInputsElements.forEach(input => {
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = input.name;
-            hiddenInput.value = input.value;
-            form.appendChild(hiddenInput);
+            console.log(`Description ID: ${input.dataset.descriptionId}, Quantity: ${input.value}`);
         });
+        
+        // Add current quantity inputs to the main form
+        quantityInputsElements.forEach(input => {
+            // Validate the input has a value
+            if (input.value && input.dataset.descriptionId) {
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = `quantities[${input.dataset.descriptionId}]`;
+                hiddenInput.value = parseInt(input.value);
+                form.appendChild(hiddenInput);
+                
+                // Debug: Log what's being added
+                console.log(`Added hidden input: ${hiddenInput.name} = ${hiddenInput.value}`);
+            }
+        });
+        
+        // Debug: Log all form data before submission
+        const formData = new FormData(form);
+        console.log('Final form data:');
+        for (let [key, value] of formData.entries()) {
+            console.log(`${key}: ${value}`);
+        }
+        
+        // Hide the modal
+        quantityModal.hide();
         
         // Submit the form
         form.submit();
