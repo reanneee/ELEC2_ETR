@@ -13,18 +13,18 @@ return new class extends Migration
     {
         Schema::create('linked_equipment_items', function (Blueprint $table) {
             $table->id();
-
+        
             $table->foreignId('fund_id')->constrained('funds')->onDelete('cascade');
-
+        
             $table->string('original_property_no');
-
-            $table->string('reference_mmdd', 5); 
-
+            $table->string('reference_mmdd', 5);
             $table->string('new_property_no')->unique();
-            $table->foreignId('location_id')->constrained('locations')->onDelete('cascade');
+            $table->string('year');
+            $table->string('location')->default('00');
             $table->timestamps();
             $table->index(['reference_mmdd']);
         });
+        
     }
 
     /**

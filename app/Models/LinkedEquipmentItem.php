@@ -12,11 +12,15 @@ class LinkedEquipmentItem extends Model
     protected $fillable = [
         'fund_id',
         'original_property_no',
+        'year',
         'reference_mmdd',
         'new_property_no',
-        'location_id',
+        
+        'location',
+       
     ];
 
+  
     /**
      * Get the fund that owns the linked equipment item.
      */

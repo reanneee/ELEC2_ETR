@@ -85,8 +85,7 @@
                             </tr>
                         </thead>
                         <tbody id="inventoryTableBody">
-                            <!-- Fixed section for your Blade template -->
-                          <!-- Fixed section for your Blade template -->
+  <!-- Fixed section for your Blade template -->
 @php $itemIndex = 0; @endphp
 @foreach($processedDescriptions as $description)
     @foreach($description->items as $item)
@@ -94,7 +93,13 @@
         $fundMatch = $fundMatches->get($item->item_id);
         $equipmentItem = $equipmentItems->firstWhere('property_no', $item->property_no);
         $linkedItem = $linkedItems->get($item->property_no);
-        $currentNewPropertyNo = $linkedItem ? $linkedItem->new_property_no : '';
+        
+        // Construct the full new property number from linked_equipment_items table
+        $currentNewPropertyNo = '';
+        if ($linkedItem) {
+            // Use the constructed full_new_property_no from the SQL query
+            $currentNewPropertyNo = $linkedItem->full_new_property_no;
+        }
         @endphp
         <tr class="inventory-row" data-description-id="{{ $description->description_id }}">
             <!-- Article/Item Column -->
@@ -127,6 +132,10 @@
                     value="{{ $currentNewPropertyNo }}"
                     data-old-property="{{ $item->property_no }}"
                     data-fund-account-code="{{ $fundMatch->account_code ?? '' }}"
+                    data-linked-item-id="{{ $linkedItem->id ?? '' }}"
+                    data-reference-mmdd="{{ $linkedItem->reference_mmdd ?? '' }}"
+                    data-sequence="{{ $linkedItem->new_property_no ?? '' }}"
+                    data-location-code="{{ $linkedItem->location ?? '' }}"
                     readonly>
             </td>
 
@@ -139,11 +148,11 @@
 
             <!-- Unit Value Column -->
             <td>
-    <input type="number" class="form-control form-control-sm unit-value"
-        name="inventory_items[{{ $itemIndex }}][unit_value]"
-        value="{{ $item->unit_value ?? $description->unit_value ?? 0 }}"
-        step="0.01" min="0">
-</td>
+                <input type="number" class="form-control form-control-sm unit-value"
+                    name="inventory_items[{{ $itemIndex }}][unit_value]"
+                    value="{{ $item->unit_value ?? $description->unit_value ?? 0 }}"
+                    step="0.01" min="0">
+            </td>
 
             <!-- Qty Card Column - This represents 1 unit per individual item -->
             <td>
@@ -223,13 +232,7 @@
                 <h5 class="mb-0">Additional Information</h5>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-12 mb-3">
-                        <label for="general_remarks" class="form-label">General Remarks</label>
-                        <textarea class="form-control" id="general_remarks" name="general_remarks"
-                            rows="3" placeholder="Enter general remarks about this inventory count...">{{ old('general_remarks') }}</textarea>
-                    </div>
-                </div>
+              
 
                 <!-- Signature Fields -->
                 <div class="row">
@@ -249,11 +252,7 @@
                         <input type="text" class="form-control" id="reviewed_by_position"
                             name="reviewed_by_position" value="{{ old('reviewed_by_position') }}">
                     </div>
-                    <div class="col-md-4">
-                        <label for="received_by_name" class="form-label">Received By (Name)</label>
-                        <input type="text" class="form-control" id="received_by_name"
-                            name="received_by_name" value="{{ old('received_by_name') }}">
-                    </div>
+                   
                 </div>
             </div>
         </div>
@@ -343,52 +342,63 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Function to generate new property number
+    // Function to generate new property number format: YEAR-reference_mmdd-new_property_no-location
     function generateNewPropertyNumber(oldPropertyNo, fundAccountCode, locationId, inputElement) {
         if (!fundAccountCode) {
             inputElement.value = '';
             return;
         }
 
-        // Extract 4th to 7th digits from fund account code and format as MM-DD
-        // Example: 10601010-00 -> digits 4-7 are "0101" -> format as "01-01"
-        const digits = fundAccountCode.substring(3, 7); // Get 4th to 7th digit (0-indexed)
-        const mmdd = digits.substring(0, 2) + '-' + digits.substring(2, 4); // Fix: use substring(2, 4) not substring(2, 2)
+        // Extract existing data from data attributes
+        let referenceMmdd = inputElement.getAttribute('data-reference-mmdd');
+        let sequence = inputElement.getAttribute('data-sequence');
+
+        // If no existing data, generate new ones
+        if (!referenceMmdd || !sequence) {
+            // Extract 4th to 7th digits from fund account code and format as MM-DD
+            const digits = fundAccountCode.substring(3, 7);
+            referenceMmdd = digits.substring(0, 2) + '-' + digits.substring(2, 4);
+            
+            // Generate sequence number based on row index
+            const rowIndex = inputElement.closest('tr').querySelector('.location-select').getAttribute('data-row-index');
+            sequence = String(parseInt(rowIndex) + 1).padStart(4, '0');
+        }
+
+        // Format location code
+        const locationCode = locationId ? String(locationId).padStart(2, '0') : '00';
+
         const currentYear = new Date().getFullYear();
-
-        // For demo purposes, generate a simple sequence
-        // In real implementation, you'd make an AJAX call to get the proper sequence
-        const rowIndex = inputElement.closest('tr').querySelector('.location-select').getAttribute('data-row-index');
-        const sequence = String(parseInt(rowIndex) + 1).padStart(4, '0');
+        const newPropertyNo = `${currentYear}-${referenceMmdd}-${sequence}-${locationCode}`;
         
-        // Use locationId if provided, otherwise default to '00'
-        const locationSuffix = locationId ? String(locationId).padStart(2, '0') : '00';
-
-        const newPropertyNo = `${currentYear}-${mmdd}-${sequence}-${locationSuffix}`;
         inputElement.value = newPropertyNo;
 
-        // Optional: Make AJAX call to save this to database
-        if (locationId) {
-            saveNewPropertyNumber(oldPropertyNo, fundAccountCode, newPropertyNo, locationId);
+        // Update data attributes for future reference
+        inputElement.setAttribute('data-reference-mmdd', referenceMmdd);
+        inputElement.setAttribute('data-sequence', sequence);
+        inputElement.setAttribute('data-location-code', locationCode);
+
+        // Save to database via AJAX
+        if (locationId && oldPropertyNo) {
+            saveOrUpdateLinkedEquipmentItem(oldPropertyNo, referenceMmdd, sequence, locationCode);
         }
     }
 
-    // Generate initial property numbers on page load
+    // Generate initial property numbers on page load for items that don't have them
     inventoryRows.forEach((row, index) => {
         const newPropertyInput = row.querySelector('.new-property-input');
         const oldPropertyNo = newPropertyInput.getAttribute('data-old-property');
         const fundAccountCode = newPropertyInput.getAttribute('data-fund-account-code');
         const locationSelect = row.querySelector('.location-select');
         
-        // Get current location ID if selected
-        let locationId = null;
-        if (locationSelect && locationSelect.value) {
-            const selectedOption = locationSelect.options[locationSelect.selectedIndex];
-            locationId = selectedOption.getAttribute('data-location-id');
-        }
+        // Only generate if there's no existing new property number
+        if (!newPropertyInput.value && oldPropertyNo && fundAccountCode) {
+            // Get current location ID if selected
+            let locationId = null;
+            if (locationSelect && locationSelect.value) {
+                const selectedOption = locationSelect.options[locationSelect.selectedIndex];
+                locationId = selectedOption.getAttribute('data-location-id');
+            }
 
-        // Generate property number (with or without location)
-        if (oldPropertyNo && fundAccountCode) {
             generateNewPropertyNumber(oldPropertyNo, fundAccountCode, locationId, newPropertyInput);
         }
     });
@@ -439,7 +449,7 @@ document.addEventListener('DOMContentLoaded', function() {
             input.addEventListener('input', updateSummary);
         });
 
-        // Handle location change to update new property number
+        // Handle location change to update new property number and linked_equipment_items
         if (locationSelect) {
             locationSelect.addEventListener('change', function() {
                 const selectedOption = this.options[this.selectedIndex];
@@ -448,41 +458,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 const oldPropertyNo = newPropertyInput.getAttribute('data-old-property');
                 const fundAccountCode = newPropertyInput.getAttribute('data-fund-account-code');
 
-                if (oldPropertyNo && fundAccountCode) {
-                    // Generate new property number (locationId can be null for default '00')
+                if (oldPropertyNo && fundAccountCode && locationId) {
                     generateNewPropertyNumber(oldPropertyNo, fundAccountCode, locationId, newPropertyInput);
                 }
             });
         }
     });
 
-    // Optional: Function to save new property number via AJAX
-    function saveNewPropertyNumber(oldPropertyNo, fundAccountCode, newPropertyNo, locationId) {
-        fetch('/api/generate-property-number', {
+    // Function to save or update linked equipment item via AJAX
+    function saveOrUpdateLinkedEquipmentItem(oldPropertyNo, referenceMmdd, sequence, locationCode) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+        
+        if (!csrfToken) {
+            console.error('CSRF token not found');
+            return;
+        }
+
+        fetch('/api/save-linked-equipment-item', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    'X-CSRF-TOKEN': csrfToken.getAttribute('content')
                 },
                 body: JSON.stringify({
-                    old_property_no: oldPropertyNo,
-                    fund_account_code: fundAccountCode,
-                    location_id: locationId
+                    original_property_no: oldPropertyNo,
+                    reference_mmdd: referenceMmdd,
+                    new_property_no: sequence,
+                    location: locationCode
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Update the input with the actual generated property number
-                    newPropertyInput.value = data.new_property_no;
+                    console.log('Linked equipment item saved successfully');
+                } else {
+                    console.error('Error saving linked equipment item:', data.message);
                 }
             })
             .catch(error => {
-                console.error('Error generating property number:', error);
+                console.error('Error saving linked equipment item:', error);
             });
     }
 
-    // Form validation
+    // Form validation and submission
     document.getElementById('inventoryForm').addEventListener('submit', function(e) {
         const entityId = entitySelect.value;
         if (!entityId) {
@@ -495,11 +513,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check if all required fields are filled
         const requiredFields = this.querySelectorAll('[required]');
         let hasEmptyFields = false;
+        let firstEmptyField = null;
 
         requiredFields.forEach(field => {
             if (!field.value.trim()) {
                 hasEmptyFields = true;
                 field.classList.add('is-invalid');
+                if (!firstEmptyField) {
+                    firstEmptyField = field;
+                }
             } else {
                 field.classList.remove('is-invalid');
             }
@@ -508,10 +530,46 @@ document.addEventListener('DOMContentLoaded', function() {
         if (hasEmptyFields) {
             e.preventDefault();
             alert('Please fill in all required fields.');
+            if (firstEmptyField) {
+                firstEmptyField.focus();
+            }
             return false;
         }
 
-        return confirm('Are you sure you want to save this inventory count? This action cannot be undone.');
+        // Validate that all locations are selected
+        let missingLocations = false;
+        inventoryRows.forEach(row => {
+            const locationSelect = row.querySelector('.location-select');
+            if (!locationSelect.value) {
+                missingLocations = true;
+                locationSelect.classList.add('is-invalid');
+            } else {
+                locationSelect.classList.remove('is-invalid');
+            }
+        });
+
+        if (missingLocations) {
+            e.preventDefault();
+            alert('Please select a location for all items.');
+            return false;
+        }
+
+        // Show loading state
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        submitButton.disabled = true;
+
+        // Confirm submission
+        if (!confirm('Are you sure you want to save this inventory count? This action cannot be undone.')) {
+            e.preventDefault();
+            // Restore button state
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
+            return false;
+        }
+
+        return true;
     });
 
     // Initialize summary

@@ -12,21 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('inventory_count_form', function (Blueprint $table) {
-            $table->id('inventory_id');
+            $table->id();
             $table->unsignedBigInteger('entity_id');
             $table->date('inventory_date')->nullable();
-            $table->string('article_item')->nullable();
-            $table->text('description')->nullable();
-            $table->string('old_property_no', 100)->nullable();
-            $table->string('new_property_no', 100)->nullable();
-            $table->string('unit', 50)->nullable();
-            $table->decimal('unit_value', 10, 2)->nullable();
-            $table->integer('qty_card')->nullable();
-            $table->integer('qty_physical')->nullable();
-            $table->string('location')->nullable();
-            $table->string('condition')->nullable();
-            $table->text('remarks')->nullable();
-            $table->string('received_by_name')->nullable();
+         
             $table->string('prepared_by_name')->nullable();
             $table->string('reviewed_by_name')->nullable();
             $table->string('prepared_by_position')->nullable();

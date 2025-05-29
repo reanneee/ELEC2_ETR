@@ -144,8 +144,7 @@ class ReceivedEquipmentController extends Controller
      private function createLinkedEquipmentItem($propertyNo)
      {
          try {
-             // Extract MM-DD from property number (5th-8th digits)
-             // Property format: 2024-05-03-0699-01
+         
              $parts = explode('-', $propertyNo);
              
              if (count($parts) >= 3) {
@@ -165,7 +164,7 @@ class ReceivedEquipmentController extends Controller
                          'original_property_no' => $propertyNo,
                          'reference_mmdd' => $referenceMmdd,
                          'new_property_no' => $newPropertyNo,
-                         'location_id' => 1, // Default location representing "00"
+                         'location' =>00, // Default location representing "00"
                      ]);
                      
                      return $linkedItem;
@@ -197,7 +196,7 @@ class ReceivedEquipmentController extends Controller
          }
          
          // Format as 4-digit number with -00 suffix
-         return sprintf('%04d-00', $nextNumber);
+         return sprintf('%04d', $nextNumber);
      }
     /**
      * Display the specified resource.

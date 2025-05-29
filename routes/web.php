@@ -59,13 +59,16 @@ Route::get('property_cards/{property_card}/edit', [PropertyCardController::class
 Route::put('property_cards/{property_card}', [PropertyCardController::class, 'update'])->name('property_cards.update');
 Route::delete('property_cards/{property_card}', [PropertyCardController::class, 'destroy'])->name('property_cards.destroy');
 
-// inventory
-Route::post('/inventory/create', [ReceivedEquipmentDescriptionController::class, 'createInventory'])
-    ->name('inventory.create');
-Route::post('/inventory/store', [ReceivedEquipmentDescriptionController::class, 'storeInventory'])
-    ->name('inventory.store');
-    Route::post('/api/generate-property-number', [ReceivedEquipmentDescriptionController::class, 'generatePropertyNumber']);
-});
 
+// Inventory routes
+Route::get('/inventory/create', [InventoryCountFormController::class, 'create'])->name('inventory.create');
+Route::post('/inventory/create', [InventoryCountFormController::class, 'createInventory'])->name('inventory.create.post');
+Route::post('/inventory', [InventoryCountFormController::class, 'store'])->name('inventory.store');
+Route::get('/inventory', [InventoryCountFormController::class, 'index'])->name('inventory.index');
+
+// API routes
+Route::post('/api/generate-property-number', [ReceivedEquipmentDescriptionController::class, 'generatePropertyNumber']);
+Route::post('/api/save-linked-equipment-item', [InventoryCountFormController::class, 'saveLinkedEquipmentItem']);
+});
 
 
