@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('account_title');
             $table->string('account_code')->unique();
+            $table->string('code')->unique();
             $table->timestamps();
         });
     }
